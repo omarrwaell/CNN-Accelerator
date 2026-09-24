@@ -10,22 +10,7 @@
 // counts. Here the fast clock comes straight in and the system clock is
 // divided down by a BUFR (BUFR_DIVIDE = "6"), which costs almost nothing.
 // Vivado derives the divided clock automatically from the BUFR, so the XDC
-// only needs create_clock on clk_in.
-//
-// Consequences:
-//  * The BUFR drives only its own clock region, so all clk_sys logic must fit
-//    in one region. This design is small enough; Vivado places it there.
-//  * BUFG and BUFR have different insertion delays, so the two clocks are
-//    related but skewed. M3 re-registers every clk_sys -> clk_fast crossing
-//    once in clk_fast before use, and all crossings are timed by Vivado.
-//  * The phase of the divided clock is not fixed; M3 detects it at run time
-//    (tog_s / ph), so no particular phase is assumed.
-//
-// Simulation (SYNTHESIS not defined): clk_fast = clk_in, and clk_sys toggles
-// every 3rd clk_in rising edge. Both are driven from clk_in with blocking /
-// continuous assignments, so flip-flops on either clock see the same pre-edge
-// values (no delta-cycle race).
-// =============================================================================
+// only needs create_clock on clk_in. 
 
 module clk_gen_6x (
     input  wire clk_in,
