@@ -1,5 +1,5 @@
 ## =============================================================================
-## power_activity.tcl -- switching activity for report_power (NOT a timing XDC)
+## power_activity.tcl -- switching activity for report_power  
 ## -----------------------------------------------------------------------------
 ## Run in the implemented design (Tcl console after open_run impl_1, or as
 ## impl_1's STEPS.ROUTE_DESIGN.TCL.POST) before report_power.
@@ -10,13 +10,9 @@
 ##   do sim/scripts/run_all_image_tests.do 32
 ## Its IMG-TC1 run records activity only while dut.busy=1 (active convolution,
 ## reset/idle excluded) and writes sim/imgtc1_active.saif. Re-run it whenever
-## the RTL changes so the SAIF names match the design.
-##
-## Option B (fallback if the SAIF is missing): vectorless defaults for the
-## input ports only. Fixes "I/O nodes activity"; overall stays Medium.
-## =============================================================================
+## the RTL changes so the SAIF names match the design. 
 
-set SAIF_FILE  {C:/Users/omarr/OneDrive/Desktop/cnn 1.1/sim/imgtc1_active.saif}
+set SAIF_FILE  {../sim/imgtc1_active.saif}
 set SAIF_SCOPE tb_imgtc1_basic_correctness/dut
 
 reset_switching_activity -all
