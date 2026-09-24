@@ -2,40 +2,13 @@
 // =============================================================================
 // M6 - Control FSM
 // -----------------------------------------------------------------------------
-// Source: files(2)/M6_control_fsm.sv, ported to Verilog-2001 with two changes
-// made during integration (both explained below).
-//
+ 
 // Coordinates one image/kernel pass:
 //   IDLE   - waiting for start
 //   STREAM - requesting pixels until IMG_WIDTH^2 have been accepted
 //   DRAIN  - fixed wait for M3+M5 to flush into M7
 //   DONE   - parked until M7 confirms every result of this pass was released
-//
-// A one-cycle pass_reset pulse is issued on entry to STREAM. It goes to BOTH
-// M2 (clears its row/column position counters) and M7 (rebuilds its reserve
-// from scratch). Without it a second back-to-back pass inherits the previous
-// pass's counter state and M2 would assert window_valid before real new-pass
-// data has filled the window registers.
-//
-// CHANGE 1 - back-to-back passes.
-//   The original went DONE -> IDLE on start, so launching a second pass needed
-//   the start pulse held for two cycles (once to leave DONE, once to leave
-//   IDLE). DONE now goes straight to STREAM on start, gated on
-//   fifo_all_outputs_done so a new pass can never begin while M7 is still
-//   emptying the previous one. This is what makes the multi-kernel bonus work
-//   from a single start pulse per pass.
-//
-// CHANGE 2 - stall-safe pixel counting.
-//   The original counted every STREAM cycle. It now counts only cycles where
-//   the source actually presents a pixel (pixel_in_valid), so a stalling image
-//   source cannot cause the FSM to end STREAM early and lose the tail of the
-//   image. M1/M2/M3 were already stall-safe; this makes the control path match.
-//
-// CHANGE 3 - PIPE_LATENCY replaces MAC_LATENCY.
-//   The drain wait must cover M3 (5 cycles) plus M5 (1 cycle) = 6, not 5.
-//   Harmless in the original because `done` also waits on
-//   fifo_all_outputs_done, but the parameter now means what its name says.
-// =============================================================================
+ 
 
 module control_fsm #(
     parameter IMG_WIDTH    = 32,
