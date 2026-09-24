@@ -3,25 +3,6 @@
 // M3 - MAC Engine (transposed form, two products per DSP operation)
 // -----------------------------------------------------------------------------
 // One 3x3 convolution result per clk cycle using ONE DSP48E1 (6x pumped).
-//
-// WHY THIS SHAPE
-// Row r of the window at column x is  w_r0*q_r(x-2) + w_r1*q_r(x-1) + w_r2*q_r(x)
-// where q_r(x) is the newest pixel of row r. Each incoming pixel therefore
-// meets all three weights of its kernel row, one per cycle, over three
-// consecutive windows. Instead of multiplying the nine window taps, every NEW
-// pixel is multiplied once by all three of its row weights as it arrives, and
-// the column partial sums are carried forward in time:
-//
-//   A = sum_r w_r0*q_r      B = sum_r w_r1*q_r      C = sum_r w_r2*q_r
-//   T1 <= A                 T2 <= T1 + B            result <= T2 + C
-//
-//   => result(x) = A(x-2) + B(x-1) + C(x)          (transposed 3-tap filter)
-//
-// T1/T2/result advance only on accepted pixels, so a stalled source is a
-// no-op exactly as in M1/M2, and row boundaries need no special handling:
-// the two columns at the start of each row refill T1/T2 before window_valid
-// can rise again.
-//
 // TWO PRODUCTS PER DSP OPERATION
 // q*w_r0 and q*w_r1 come from a single multiply by packing both weights into
 // the 25-bit A port:
@@ -41,23 +22,10 @@
 // clk_fast divided by 6 in a BUFR (no MMCM), so the crossings are synchronous
 // and timed by Vivado.
 //
-// LUT-LEAN DATAPATH (the FOM counts LUTs, not flip-flops):
-//  * Weights arrive as a serial tap stream from M4. The six DSP A operands are
-//    built from it with ONE shared 9-bit subtractor and dropped into a 6-word
-//    flip-flop ring on clk_fast that rotates in step with the phase, so the
-//    DSP A input needs no 6:1 mux.
-//  * The column sums A/B/C are accumulated on clk_fast as the DSP results come
-//    out, one per fast cycle, instead of by six adders on clk.
-//  * The rounding bias 2^(FRAC_BITS-1) is preloaded into the C accumulator, so
-//    mac_result = true sum + 2^(FRAC_BITS-1) and M5 needs no rounding adder.
-//
 // Pipeline (clk cycles; data stages after s3 are enabled by their valid):
 //   s1  column registered          s2-s3  6 DSP ops + A/B/C sums on clk_fast
 //   s3  A/B/C back in clk          s4-s5  balancing registers (flip-flops only)
 //   s6  T1 / T2 / result
-// Latency: 6 clk cycles from pixel_valid/window_valid to mac_result_valid,
-// unchanged, so M5/M6/M7 timing is unchanged.
-//
 // Bit-exact with the 9-product sum (plus the documented rounding bias): every
 // intermediate is wide enough for its worst case (A,B,C: 3 products -> 18
 // bits; T2: 6 -> 19; result: 9 products + bias -> 20).
@@ -99,9 +67,7 @@ module M3 #(parameter PIXEL_WIDTH = 8, WEIGHT_WIDTH = 8, ACC_WIDTH = 20,
     end
     // synthesis translate_on
 
-    // --- Stage valids: the only reset registers in M3 ------------------------
-    // shreg_extract = "no": keep these (and the operand ring below) as
-    // flip-flops -- an SRL would cost LUTs, which the FOM counts; FFs are free.
+    // --- Stage valids: the only reset registers in M3 ------------------------ 
     (* shreg_extract = "no" *) reg [5:1] ev;   // ev[k]: stage k holds an accepted pixel
     (* shreg_extract = "no" *) reg [6:1] wv;   // wv[k]: ...that completes a window
     always @(posedge clk) begin
@@ -113,21 +79,12 @@ module M3 #(parameter PIXEL_WIDTH = 8, WEIGHT_WIDTH = 8, ACC_WIDTH = 20,
             wv <= {wv[5:1], window_valid};
         end
     end
-
-    // --- DSP operation schedule ------------------------------------------------
-    // Per clk cycle the DSP runs six operations, op k issued in fast phase k+1:
-    //   op 0: q0 * packed(w00,w01)   op 1: q0 * w02
-    //   op 2: q1 * packed(w10,w11)   op 3: q1 * w12
-    //   op 4: q2 * packed(w20,w21)   op 5: q2 * w22
-    // Single-weight operations use the same +2^15 offset and are read from the
-    // low lane, exactly like a packed operation's low product.
-
+ 
     // --- Operand build from the M4 tap stream (clk) -----------------------------
     // Tap order is row-major, so a row's column-0 tap arrives just before its
     // column-1 tap. Word for slot k (s = sign of the incoming tap):
     //   column 1 tap -> slot 2r:   {w_c0 - s, {8{s}}, w_c1}   (packed)
-    //   column 2 tap -> slot 2r+1: {   0 - s, {8{s}}, w_c2}   (w_c2 sign-extended)
-    // so one 9-bit subtractor serves all six words.
+
     wire [1:0] t_col = tap_idx % 3;
     wire [1:0] t_row = tap_idx / 3;
     wire       t_s   = tap_data[WEIGHT_WIDTH-1];
